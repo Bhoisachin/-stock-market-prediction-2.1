@@ -20,12 +20,6 @@ load_dotenv()
 NVIDIA_API_KEY  = os.getenv("GOOGLE_API_KEY")
 
 # Initialize Whisper model
-try:
-    whisper_model = WhisperModel("base", compute_type="int8")
-except Exception as e:
-    st.error(f"Failed to initialize Whisper model: {e}")
-    whisper_model = None
-
 # Initialize stock name dictionary
 @st.cache_data
 def load_stock_data():
