@@ -12,15 +12,12 @@ from dotenv import load_dotenv
 import time
 from pypfopt import EfficientFrontier, risk_models, expected_returns
 import matplotlib.pyplot as plt
-from faster_whisper import WhisperModel
 import subprocess
-from transformers import pipeline
 import re
 
 # Load environment variables
 load_dotenv()
 NVIDIA_API_KEY  = os.getenv("GOOGLE_API_KEY")
-sentiment_model = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment",device=-1)
 
 # Initialize Whisper model
 try:
@@ -385,110 +382,6 @@ def stock_prediction_section():
         else:
             predict_time_range(selected_stock, stock_symbol, operation, time_range)
 
-def transcribe_audio(path):
-    """Transcribe audio file using faster_whisper."""
-    if not whisper_model:
-        st.error("Whisper model unavailable.")
-        return ""
-    try:
-        segments, info = whisper_model.transcribe(path, beam_size=5)
-        lang = info.language
-        full_text = " ".join([seg.text for seg in segments])
-        return full_text,lang
-    except Exception as e:
-        st.error(f"Transcription failed: {e}")
-        return ","
-
-def news_summarizer_section():
-    """News summarizer section for YouTube video summaries."""
-    st.header("YouTube News Summarizer")
-    st.write("Enter a YouTube video URL to summarize stock-related news.")
-    
-    video_url = st.text_input("Enter YouTube Video URL:", key="news_video_url")
-    
-    if st.button("Process Video", key="process_video"):
-        if not video_url.strip():
-            st.error("Please enter a valid YouTube URL.")
-            return
-        
-        audio_path = "audio.mp3"
-        
-        # Step 1: Download audio using yt-dlp
-        st.write("📥 Downloading audio...")
-        try:
-            command = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", audio_path, video_url]
-            result = subprocess.run(command, capture_output=True, text=True)
-            if result.returncode != 0:
-                st.error(f"Failed to download audio: {result.stderr}")
-                return
-        except Exception as e:
-            st.error(f"Audio download failed: {e}")
-            return
-        
-        # Step 2: Transcribe audio
-        st.write("🎙 Transcribing audio...")
-        transcript, detected_lang = transcribe_audio(audio_path)
-        st.info(f"🈶 Detected Language: {detected_lang.upper()}")
-        transcript = translate_to_english(transcript, detected_lang)
-
-        if not transcript:
-            st.error("Transcription failed. Please try another video.")
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
-            return
-        st.write("Transcript (preview):", transcript[:1000], "...")
-        
-        # Step 3: Clean up audio file
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
-        
-        # Step 4: Generate summary using existing AI function
-        st.write("📝 Generating Summary...")
-        summary_prompt = f"Summarize the following news content related to stocks or markets:\n\n{transcript}"
-        summary = call_ai(summary_prompt)
-        if summary == "Unable to get AI response.":
-            st.error("Failed to generate summary.")
-        else:
-            st.success("✅ Summary Ready!")
-            st.write(summary)
-
-            # Step 5: Sentiment scoring
-            st.write("🧠 Analyzing Sentiment...")
-            cleaned_summary = clean_text(summary)
-            score = get_sentiment_score(cleaned_summary)
-
-            if score == 1:
-                st.success("📊 Sentiment: Positive")
-            elif score == 0:
-                st.warning("📊 Sentiment: Neutral")
-            else:
-                st.error("📊 Sentiment: Negative")
-
-def get_sentiment_score(text):
-    """Get sentiment score from cleaned news summary."""
-    result = sentiment_model(text[:512])[0]  # Limit to 512 chars
-    label = result['label']
-    if "1" in label or "2" in label:
-        return -1  # Negative
-    elif "3" in label:
-        return 0   # Neutral
-    else:
-        return 1   # Positive
-
-def clean_text(text):
-    """Clean up raw transcript for sentiment scoring."""
-    text = re.sub(r'\[.*?\]', '', text)
-    text = re.sub(r'http\S+', '', text)
-    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-    return text.strip()
-
-def translate_to_english(text, lang_code):
-    """Use Gemini API to translate any language text to English."""
-    if lang_code == "en":
-        return text
-    prompt = f"Translate this text from {lang_code} to English:\n\n{text}"
-    return call_ai(prompt)
-
 def fetch_real_time_data(stock_symbol):
     """Fetch real-time stock data using yfinance with 1-minute interval."""
     try:
@@ -516,14 +409,12 @@ def main():
     st.title("MARKET.AI")
     st.sidebar.header("Navigation")
     
-    section = st.sidebar.radio("Select section", ["Stock Prediction", "Portfolio Optimization", "News Summarizer", "AI Assistant"])
+    section = st.sidebar.radio("Select section", ["Stock Prediction", "Portfolio Optimization", "AI Assistant"])
     
     if section == "Stock Prediction":
         stock_prediction_section()
     elif section == "Portfolio Optimization":
         portfolio_section()
-    elif section == "News Summarizer":
-        news_summarizer_section()
     else:
         question_recognizer()
 
